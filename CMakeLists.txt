@@ -25,7 +25,7 @@ include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
 include_directories(include) #global include for all target
-add_executable(app src/app.cpp)
+add_executable(app src/basic.cpp)
 target_link_libraries(app ${CONAN_LIBS})
 target_compile_features(app PUBLIC cxx_std_20)
 
