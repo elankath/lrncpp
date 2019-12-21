@@ -2,7 +2,10 @@ build/*
 !build/dummy.txt
 tags
 .ccls-cache/
-.idea/
+.idea/*
+!.idea/workspace.xml
+!.idea/.name
+!.idea/modules.xml
 **/*.iml
 cmake-build-debug/
 compile_commands.json
