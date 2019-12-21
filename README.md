@@ -1,4 +1,4 @@
-# skel-cpp-basic
+# skel-cpp-myapp
 
 Project Template for C++20 Basic C++ CLI App with CMakeFiles.txt and leveraging Conan for pkg management
 

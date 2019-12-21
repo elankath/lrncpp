@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
-project(cppbasic VERSION 1.0 LANGUAGES CXX)
+project(cppmyapp VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -25,7 +25,7 @@ include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
 include_directories(include) #global include for all target
-add_executable(app src/basic.cpp)
+add_executable(app src/myapp.cpp)
 target_link_libraries(app ${CONAN_LIBS})
 target_compile_features(app PUBLIC cxx_std_20)
 

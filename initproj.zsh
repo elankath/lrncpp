@@ -33,7 +33,7 @@ function main() {
   else
     error_exit "Conan not installed!" 2
   fi
-  cmake -H$scriptDir -B $scriptDir/build -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX 
+  cmake -H$scriptDir -B $scriptDir/build  -DCMAKE_CXX_COMPILER=$CXX 
 }
 
 function detect_os() {

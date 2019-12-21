@@ -1,5 +1,5 @@
-#ifndef BASIC_APP_H
-#define BASIC_APP_H
+#ifndef MYAPP_APP_H
+#define MYAPP_APP_H
 
 #include <string>
 struct person {
