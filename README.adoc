@@ -338,15 +338,18 @@ Prefer capturing by reference in lambdas that will be used locally, including pa
 
 [source,cpp]
 ----
-// Here, a large object (a network message) is passed to an iterative algorithm, and is it not efficient or correct to copy the message (which might not be copyable):
+// Here, a large object (a network message) is passed to an iterative algorithm,
+// and is it not efficient or correct to copy the message (which might not be copyable):
 std::for_each(begin(sockets), end(sockets), [&message](auto& socket)
 {
     socket.send(message);
 });
 
 /*
-This is a simple three-stage parallel pipeline. Each stage object encapsulates a worker thread and a queue, has a process function to enqueue work, and in its destructor automatically blocks waiting for the queue to empty before ending the thread.
-*
+This is a simple three-stage parallel pipeline.
+Each stage object encapsulates a worker thread and a queue, has a process function to enqueue work
+,and in its destructor automatically blocks waiting for the queue to empty before ending the thread.
+*/
 void send_packets(buffers& bufs)
 {
     stage encryptor([](buffer& b) { encrypt(b); });
