@@ -4,6 +4,10 @@ Version 0.2, 2020-11-20
 :toc:
 C++ Notes
 
+== Strings
+
+=== Use zstring and czstring for C-style,zero-terminated strings.
+
 
 == Pointers, Ownership
 === GSL owner
@@ -35,12 +39,76 @@ int length(not_null<const char*> p);  // better: we can assume that p cannot be 
 int length(const char* p);            // we must assume that p can be nullptr
 ----
 
+=== Pointers and References
+==== For general use, take T* or T& arguments rather than smart pointers
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#f7-for-general-use-take-t-or-t-arguments-rather-than-smart-pointers
+
+Passing a smart pointer transfers or shares ownership and should only be used when ownership semantics are intended.
+A function that does not manipulate lifetime should take raw pointers or references instead.
+
+Obviously don't T* and T& to async functions, ie lifetime of pointer should be valid.
+
+[source,cpp]
+----
+// accepts any int*
+void f(int*);
+
+// can only accept ints for which you want to transfer ownership
+void g(unique_ptr<int>);
+
+// can only accept ints for which you are willing to share ownership
+void g(shared_ptr<int>);
+
+// doesn't change ownership, but requires a particular ownership of the caller
+void h(const unique_ptr<int>&);
+
+// accepts any int
+void h(int&);
+----
+
+==== Prefer T* over T& when "no argument" is a valid option
+A pointer (T*) can be a nullptr and a reference (T&) cannot, there is no valid "null reference".
+Sometimes having nullptr as an alternative to indicated "no object" is useful, but if it is not, a reference is notationally simpler and might yield better code.
+
+[source,cpp]
+----
+string zstring_to_string(zstring p) // zstring is a char*; that is a C-style string
+{
+    if (!p) return string{};    // p might be nullptr; remember to check
+    return string{p};
+}
+
+void print(const vector<int>& r)
+{
+    // r refers to a vector<int>; no check needed
+}
+----
+==== Return a T* to indicate a position (only)
+That's what pointers are good for. Returning a T* to transfer ownership is a misuse.
+*Note* Do NOT return a pointer to something that is not in the caller's scope
+
+[source,cpp]
+----
+Node* find(Node* t, const string& s)  // find s in a binary tree of Nodes
+{
+    if (!t || t->name == s) return t;
+    if ((auto p = find(t->left, s))) return p;
+    if ((auto p = find(t->right, s))) return p;
+    return nullptr; // possibly better to use std::optional ?
+}
+----
+
+
+
+
+
+
 
 === std::unique_ptr
 
 == Functions
 
-=== Function Parameters, Pre-Conditions, Post-Conditions,  Return
+=== Function Parameters
 
 ==== Function Parameters should be strongly typed
 https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i4-make-interfaces-precisely-and-strongly-typed
@@ -107,6 +175,21 @@ void use()
     blink_led(1500ms);
 }
 ----
+
+==== Avoid too many parameters
+Define a struct as the parameter type and name the fields for those parameters accordingly:
+[source,cpp]
+----
+struct SystemParams {
+    string config_file;
+    string output_path;
+    seconds timeout;
+};
+void initialize(SystemParams p);
+----
+
+==== Parameter Passing
+See link:cpp_param_ref.pdf[CPP Param]
 
 ==== Leverage Pre Conditions and Post Conditions
 [source,cpp]
@@ -216,6 +299,26 @@ Then, we overwrite some probably unrelated memory.
 What if there are fewer than n elements in the array pointed to by `p`?
 Then, we read some probably unrelated memory. Either is undefined behavior and a potentially very nasty bug.
 
+== Classes
+
+=== Abstract Classes
+
+====  Prefer pure abstract classes as interfaces to class hierarchies
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i25-prefer-abstract-classes-as-interfaces-to-class-hierarchies
+
+[source,cpp]
+----
+class Shape {    // better: Shape is a pure interface
+public:
+    virtual Point center() const = 0;   // pure virtual functions
+    virtual void draw() const = 0;
+    virtual void rotate(int) = 0;
+    // ...
+    // ... NO DATA MEMBERS ...
+    // ...
+    virtual ~Shape() = default;
+};
+----
 
 == Design Patterns
 
@@ -232,6 +335,8 @@ X& myX()
     return my_x;
 }
 ----
+
+=== Pimpl
 === std::call_once
 https://en.cppreference.com/w/cpp/thread/call_once
 
