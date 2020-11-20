@@ -1,0 +1,249 @@
+= C++ Notes
+Tarun Elankath <dev@elankath.com>
+Version 0.2, 2020-11-20
+:toc:
+C++ Notes
+
+
+== Pointers, Ownership
+=== GSL owner
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i11-never-transfer-ownership-by-a-raw-pointer-t-or-reference-t
+[source,cpp]
+----
+X* compute(args)    // don't
+{
+    X* res = new X{};
+    // ...
+    return res; // Who deletes the returned X
+}
+owner<X*> compute(args)    // It is now clear that ownership is transferred
+{
+// This tells analysis tools that res is an owner. That is, its value must be deleted or transferred to another owner, as is done here by the return.
+    owner<X*> res = new X{};
+    // ...
+    return res;
+}
+----
+
+=== not_null
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i12-declare-a-pointer-that-must-not-be-null-as-not_null
+[source,cpp]
+----
+int length(const char* p);            // it is not clear whether length(nullptr) is valid
+length(nullptr);                      // OK?
+int length(not_null<const char*> p);  // better: we can assume that p cannot be nullptr
+int length(const char* p);            // we must assume that p can be nullptr
+----
+
+
+=== std::unique_ptr
+
+== Functions
+
+=== Function Parameters, Pre-Conditions, Post-Conditions,  Return
+
+==== Function Parameters should be strongly typed
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i4-make-interfaces-precisely-and-strongly-typed
+
+[source,cpp]
+----
+draw_rect(100, 200, 100, 500); // BAD: what do the numbers specify?
+draw_rect(p.x, p.y, 10, 20); // BAD: what units are 10 and 20 in?
+
+void draw_rectangle(Point top_left, Point bottom_right);
+void draw_rectangle(Point top_left, Size height_width);
+
+draw_rectangle(p, Point{10, 20});  // GOOD: two corners
+draw_rectangle(p, Size{10, 20});   // GOOD: one corner and a (height, width) pair
+
+set_settings(true, false, 42); // BAD: what do the numbers specify?
+
+alarm_settings s{}; //GOOD: safe and legible.
+s.enabled = true;
+s.displayMode = alarm_settings::mode::spinning_light;
+s.frequency = alarm_settings::every_10_seconds;
+set_settings(s);
+
+//For the case of a set of boolean values consider using a flags enum; a pattern that expresses a set of boolean values.
+enable_lamp_options(lamp_option::on | lamp_option::animate_state_transitions);
+
+
+// In the following example, it is not clear from the interface what time_to_blink means: Seconds? Milliseconds?
+
+void blink_led(int time_to_blink) // bad -- the unit is ambiguous
+{
+    // ...
+    // do something with time_to_blink
+    // ...
+}
+void use()
+{
+    blink_led(2);
+}
+// std::chrono::duration types helps making the unit of time duration explicit.
+void blink_led(milliseconds time_to_blink) // good -- the unit is explicit
+{
+    // ...
+    // do something with time_to_blink
+    // ...
+}
+void use()
+{
+    blink_led(1500ms);
+}
+template<class rep, class period>
+void blink_led(duration<rep, period> time_to_blink) // good -- accepts any unit
+{
+    // assuming that millisecond is the smallest relevant unit
+    auto milliseconds_to_blink = duration_cast<milliseconds>(time_to_blink);
+    // ...
+    // do something with milliseconds_to_blink
+    // ...
+}
+
+void use()
+{
+    blink_led(2s);
+    blink_led(1500ms);
+}
+----
+
+==== Leverage Pre Conditions and Post Conditions
+[source,cpp]
+----
+double sqrt(double x) { Expects(x >= 0); /* ... */ }
+int area(int height, int width) {
+    Expects(height > 0 && width > 0);            // good
+}
+int area(int height, int width)
+{
+    auto res = height * width;
+    Ensures(res > 0);
+    return res;
+}
+// Famous security bug
+void f()    // PROBLEMATIC
+{
+    char buffer[MAX];
+    // ...
+    memset(buffer, 0, sizeof(buffer)); //optimizer eliminated the apparently redundant memset() call:
+}
+void f()    // BETTER
+{
+    char buffer[MAX];
+    // ...
+    memset(buffer, 0, sizeof(buffer));
+    Ensures(buffer[0] == 0);
+}
+----
+
+
+
+=== Leverage typedefs and using
+[source,cpp]
+----
+class Date {
+public:
+    Month month() const;  // do
+    int month();          // don't
+    // ...
+};
+----
+
+=== std::find Examples
+[source,cpp]
+----
+void f(vector<string>& v)
+{
+    string val;
+    cin >> val;
+    // ...
+    auto p = find(begin(v), end(v), val);  // better
+    // ...
+}
+----
+
+=== std::span
+
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#p7-catch-run-time-errors-early
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i13-do-not-pass-an-array-as-a-single-pointer
+[source,cpp]
+----
+void increment1(int* p, int n)    // bad: error-prone
+{
+    for (int i = 0; i < n; ++i) ++p[i];
+}
+void increment2(span<int> p)
+{
+    for (int& x : p) ++x;
+}
+void use1(int m)
+{
+    const int n = 10;
+    int a[n] = {};
+    // ...
+    increment1(a, m);   // maybe typo, maybe m <= n is supposed
+                        // but assume that m == 20
+    // ...
+}
+void use2(int m)
+{
+    const int n = 10;
+    int a[n] = {};
+    // ...
+    increment2({a, m});    // maybe typo, maybe m <= n is supposed
+    // ...
+}
+// Now, m < = n can be checked at the point of call (early) rather than later.
+// If all we had was a typo so that we meant to use n as the bound, the code could be further simplified (eliminating the possibility of an error):
+void use3(int m)
+{
+    const int n = 10;
+    int a[n] = {};
+    // ...
+    increment2(a);   // the number of elements of a need not be repeated
+    // ...
+}
+
+----
+[source,cpp]
+----
+void copy_n(const T* p, T* q, int n); // copy from [p:p+n) to [q:q+n)
+----
+
+What if there are fewer than `n` elements in the array pointed to by `q`?
+Then, we overwrite some probably unrelated memory.
+What if there are fewer than n elements in the array pointed to by `p`?
+Then, we read some probably unrelated memory. Either is undefined behavior and a potentially very nasty bug.
+
+
+== Design Patterns
+
+=== Singletons
+
+=== Use static for singletons
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i3-avoid-singletons
+
+[source,cpp]
+----
+X& myX()
+{
+    static X my_x {3};
+    return my_x;
+}
+----
+=== std::call_once
+https://en.cppreference.com/w/cpp/thread/call_once
+
+https://stackoverflow.com/a/19992704/120959
+[source,cpp]
+----
+void g() {
+ static std::once_flag flag2;
+ std::call_once(flag2, initializer());
+}
+----
+
+
+
+
