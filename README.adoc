@@ -7,6 +7,22 @@ C++ Notes
 == Strings
 
 === Use zstring and czstring for C-style,zero-terminated strings.
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#f25-use-a-zstring-or-a-not_nullzstring-to-designate-a-c-style-string
+C-style strings are ubiquitous. They are defined by convention: zero-terminated arrays of characters. We must distinguish C-style strings from a pointer to a single character or an old-fashioned pointer to an array of characters.
+If you don't need null termination, use string_view.
+
+[source,cpp]
+----
+/* When I call length(s) should I check if s is nullptr first?
+ Should the implementation of length() check if p is nullptr? */
+int length(const char* p);
+
+// the implementor of length() must assume that p == nullptr is possible
+int length(zstring p);
+
+// it is the caller's job to make sure p != nullptr
+int length(not_null<zstring> p);
+----
 
 
 == Pointers, Ownership
@@ -99,12 +115,24 @@ Node* find(Node* t, const string& s)  // find s in a binary tree of Nodes
 ----
 
 
-
-
-
-
-
 === std::unique_ptr
+
+Use a unique_ptr<T> to transfer ownership where a pointer is needed
+Using unique_ptr is the cheapest way to pass a pointer safely.
+[source,cpp]
+----
+unique_ptr<Shape> get_shape(istream& is)  // assemble shape from input stream
+{
+    auto kind = read_header(is); // read header and identify the next shape on input
+    switch (kind) {
+    case shape_constants.circle:
+        return make_unique<Circle>(is);
+    case shape_constants.triangle:
+        return make_unique<Triangle>(is);
+    // ...
+    }
+}
+----
 
 == Functions
 
@@ -220,6 +248,39 @@ void f()    // BETTER
 }
 ----
 
+=== Default Arguments
+
+==== Where there is a choice, prefer default arguments over overloading
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#f51-where-there-is-a-choice-prefer-default-arguments-over-overloading
+
+[source,cpp]
+----
+void print(const string& s, format f = {});
+// ABOVE is BETTER than BELOW
+void print(const string& s);  // use default format
+void print(const string& s, format f);
+
+----
+==== Do not provide different default arguments for a virtual function and an overrider
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#c140-do-not-provide-different-default-arguments-for-a-virtual-function-and-an-overrider
+
+[source,cpp]
+----
+class Base {
+public:
+    virtual int multiply(int value, int factor = 2) = 0;
+    virtual ~Base() = default;
+};
+class Derived : public Base {
+public:
+    int multiply(int value, int factor = 10) override;
+};
+Derived d;
+Base& b = d;
+b.multiply(10);  // these two calls will call the same function but
+d.multiply(10);  // with different arguments and so different results
+----
+
 
 
 === Leverage typedefs and using
@@ -246,6 +307,59 @@ void f(vector<string>& v)
 }
 ----
 
+
+== Classes
+
+=== Abstract Classes
+
+====  Prefer pure abstract classes as interfaces to class hierarchies
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i25-prefer-abstract-classes-as-interfaces-to-class-hierarchies
+
+[source,cpp]
+----
+class Shape {    // better: Shape is a pure interface
+public:
+    virtual Point center() const = 0;   // pure virtual functions
+    virtual void draw() const = 0;
+    virtual void rotate(int) = 0;
+    // ...
+    // ... NO DATA MEMBERS ...
+    // ...
+    virtual ~Shape() = default;
+};
+----
+
+== Lambdas
+
+=== Capture by Reference for Local Lambdas
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#f52-prefer-capturing-by-reference-in-lambdas-that-will-be-used-locally-including-passed-to-algorithms
+
+Prefer capturing by reference in lambdas that will be used locally, including passed to algorithms
+
+[source,cpp]
+----
+// Here, a large object (a network message) is passed to an iterative algorithm, and is it not efficient or correct to copy the message (which might not be copyable):
+std::for_each(begin(sockets), end(sockets), [&message](auto& socket)
+{
+    socket.send(message);
+});
+
+/*
+This is a simple three-stage parallel pipeline. Each stage object encapsulates a worker thread and a queue, has a process function to enqueue work, and in its destructor automatically blocks waiting for the queue to empty before ending the thread.
+*
+void send_packets(buffers& bufs)
+{
+    stage encryptor([](buffer& b) { encrypt(b); });
+    stage compressor([&](buffer& b) { compress(b); encryptor.process(b); });
+    stage decorator([&](buffer& b) { decorate(b); compressor.process(b); });
+    for (auto& b : bufs) { decorator.process(b); }
+}  // automatically blocks waiting for pipeline to finish
+----
+
+
+
+
+== Utilities
 === std::span
 
 https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#p7-catch-run-time-errors-early
@@ -298,27 +412,6 @@ What if there are fewer than `n` elements in the array pointed to by `q`?
 Then, we overwrite some probably unrelated memory.
 What if there are fewer than n elements in the array pointed to by `p`?
 Then, we read some probably unrelated memory. Either is undefined behavior and a potentially very nasty bug.
-
-== Classes
-
-=== Abstract Classes
-
-====  Prefer pure abstract classes as interfaces to class hierarchies
-https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#i25-prefer-abstract-classes-as-interfaces-to-class-hierarchies
-
-[source,cpp]
-----
-class Shape {    // better: Shape is a pure interface
-public:
-    virtual Point center() const = 0;   // pure virtual functions
-    virtual void draw() const = 0;
-    virtual void rotate(int) = 0;
-    // ...
-    // ... NO DATA MEMBERS ...
-    // ...
-    virtual ~Shape() = default;
-};
-----
 
 == Design Patterns
 
