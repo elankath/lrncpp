@@ -310,6 +310,75 @@ void f(vector<string>& v)
 
 == Classes
 
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#c2-use-class-if-the-class-has-an-invariant-use-struct-if-the-data-members-can-vary-independently
+
+* Use class if the class has an invariant; use struct if the data members can vary independently0
+* Use class rather than struct if any member is non-public
+* Ensure that a copyable (value type) class has a default constructor
+* Prefer default constructors to be simple and non-throwing
+* Prefer in-class initializers to member initializers in constructors for constant initializers
+* Prefer initialization to assignment in constructors
+* Define and initialize member variables in the order of member declaration
+* Don’t define a default constructor that only initializes data members; use in-class member initializers instead.
+Using in-class member initializers lets the compiler generate the function for you.
+The compiler-generated function can be more efficient.
+* Use delegating constructors to represent common actions for all constructors of a class
+* Use a conventional class member declaration order. When declaring a class use the following order:
+ ** types: classes, enums, and aliases (using)
+ ** constructors, assignments, destructor
+ ** functions
+ ** data
+ ** Use `public` before `protected` before `private` order.
+
+
+
+[source,cpp]
+----
+struct Pair {  // the members can vary independently
+    string name;
+    int volume;
+};
+class Date {
+public:
+    // validate that {yy, mm, dd} is a valid date and initialize
+    Date(int yy, Month mm, char dd);
+    // ...
+    int day() const;
+    Month month() const;
+private:
+    int dd = 1;
+    int mm = 1;
+    int yyyy = 1970;
+};
+class A {   // Good
+    string s1;
+public:
+    A(czstring p) : s1{p} { } // GOOD: directly construct (and the C-string is explicitly named)
+    // ...
+};
+class D {   // Best
+    string s1;
+public:
+    D(string_view v) : s1{v} { } // GOOD: directly construct
+    // ...
+};
+
+class Date2 {
+    int d;
+    Month m;
+    int y;
+public:
+    Date2(int dd, Month mm, year yy)
+        :d{dd}, m{mm}, y{yy}
+        { if (!valid(d, m, y)) throw Bad_date{}; }
+
+    Date2(int dd, Month mm)
+        :Date2{dd, mm, current_year()} {}
+    // ...
+};
+// If the “repeated action” is a simple initialization, conside an in-class member initializer.
+----
+
 === Abstract Classes
 
 ====  Prefer pure abstract classes as interfaces to class hierarchies
@@ -347,8 +416,8 @@ std::for_each(begin(sockets), end(sockets), [&message](auto& socket)
 
 /*
 This is a simple three-stage parallel pipeline.
-Each stage object encapsulates a worker thread and a queue, has a process function to enqueue work
-,and in its destructor automatically blocks waiting for the queue to empty before ending the thread.
+Ea$h stage object encapsulates a worker thread and a queue, has a process function to enqueue work.
+It's destructor automatically blocks waiting for the queue to empty before ending the thread.
 */
 void send_packets(buffers& bufs)
 {
@@ -357,7 +426,55 @@ void send_packets(buffers& bufs)
     stage decorator([&](buffer& b) { decorate(b); compressor.process(b); });
     for (auto& b : bufs) { decorator.process(b); }
 }  // automatically blocks waiting for pipeline to finish
+
 ----
+=== Capture by value for Non-Local Lambdas
+
+https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#f53-avoid-capturing-by-reference-in-lambdas-that-will-be-used-non-locally-including-returned-stored-on-the-heap-or-passed-to-another-thread
+
+Pointers and references to locals shouldn't outlive their scope.
+Lambdas that capture by reference are just another place to store a reference to a local object,
+and shouldn't do so if they (or a copy) outlive the scope.
+
+[source,cpp]
+----
+int local = 42;
+// Want a reference to local.
+// Note, that after program exits this scope,
+// local no longer exists, therefore
+// process() call will have undefined behavior!
+thread_pool.queue_work([&] { process(local); }); // BAD !!
+thread_pool.queue_work([=] { process(local); }); // GOOD
+----
+
+=== If you capture this, capture all variables explicitly (no default capture)
+
+It's confusing. Writing [=] in a member function appears to capture by value, but actually
+captures data members by reference because it actually captures the invisible this pointer
+by value. If you meant to do that, write this explicitly.
+
+[source,cpp]
+----
+class my_class {
+    int x = 0;
+    // ...
+    void f() {
+        int i = 0;
+        // ...
+        auto lambda = [=] { use(i, x); };   // BAD: "looks like" copy/value capture
+        // [&] has identical semantics and copies the this pointer under the current rules
+        // [=,this] and [&,this] are not much better, and confusing
+        x = 42;
+        lambda(); // calls use(0, 42);
+        x = 43;
+        lambda(); // calls use(0, 43);
+        // ...
+        auto lambda2 = [i, this] { use(i, x); }; // ok, most explicit and least confusing
+        // ...
+    }
+};
+----
+
 
 
 
