@@ -21,7 +21,7 @@ else()
 endif()
 
 include_directories(include) #global include for all target
-add_executable(app src/learn.cpp)
+add_executable(app src/learn.cpp include/learn/utilities.hpp)
 # target_link_libraries(app ${CONAN_LIBS})
 target_compile_features(app PUBLIC cxx_std_20)
 
