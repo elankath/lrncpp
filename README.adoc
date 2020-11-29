@@ -27,6 +27,55 @@ int length(zstring p);
 int length(not_null<zstring> p);
 ----
 
+== Lang Features
+
+=== auto
+
+* The auto specifier is only a placeholder for the type, not for the const/ volatile and references specifiers.
+If you need a const/volatile and/or reference type, then you need to specify them explicitly.
+
+[source,cpp]
+----
+class foo {
+    int x_;
+public:
+    foo(int const x = 0) :x_{ x } {}
+    int& get() { return x_; }
+};
+foo f(42);
+auto x = f.get(); //type deduced as int and not int&
+x = 100;
+std::cout << f.get() << '\n'; // prints 42
+auto proxy_get(foo& f) { return f.get(); }
+auto& x = proxy_get(f); // cannot convert from 'int' to 'int &'
+----
+* This leads to problems with `auto` as a placeholder for the return type from a function.
+To fix this, we need to actually return `auto&`. But this is a problem with templates and
+perfect forwarding the return type without knowing whether its a value or a reference. The
+solution to this problem in C++14 is decltype(auto), which will correctly deduce the type:
+
+Reference : cppmove.pdf, Chapter 12: Perfect Returning with decltype(auto)
+[source,cpp]
+----
+decltype(auto) proxy_get(foo& f) { return f.get(); }
+auto f = foo{ 42 };
+decltype(auto) x = proxy_get(f);
+----
+* auto with generic lambda
+The below lambda can be used to add anything for which the `operator+` is defined,
+
+[source,cpp]
+----
+auto ladd = [] (auto const a, auto const b) { return a + b; };
+struct {
+    template<typename T, typename U>
+    auto operator () (T const a, U const b) const { return a+b; }
+} L;
+auto i = ladd(40, 2); // 42
+auto s = ladd("forty"s, "two"s); // "fortytwo"s
+----
+
+
 == Pointers, Ownership
 
 === GSL owner
@@ -505,6 +554,7 @@ void use() {
 === Spaceship operator
 
 C++20 introduced default comparisons, aka the "spaceship" operator<=>, which allows you to request compiler-generated `</<=/==/!=/>=/ and/or >` operators with the obvious/naive(?) implementation...
+
 [source,cpp]
 ----
 auto operator<=>(const my_class&) const = default;
@@ -539,7 +589,6 @@ void demo_sort_with_tie() {
   cout << "Sorted  :" << people << endl;
 }
 ----
-
 
 == Lambdas
 
@@ -773,14 +822,38 @@ Then, we read some probably unrelated memory.
 Either is undefined behavior and a potentially very nasty bug.
 
 === std::invoke
-A generic helper for writing generic code that calls a callable, regardless of whether
-it is a function, a lambda, a operator or a member function.
+
+A generic helper for writing generic code that calls a callable, regardless of whether it is a function, a lambda, a operator or a member function.
+
 [source,cpp]
 ----
-include::include/learn/utilities.hpp[lines=7..32]
+//include::include/learn/utilities.hpp[lines=7..32]
+template <typename C, typename... Args> requires std::invocable<C, Args...>
+decltype(auto) call(C&& callable, Args&&... args)
+{
+  return std::invoke(std::forward<C>(callable), std::forward<Args>(args)...);
+}
+template <typename T>
+void print(const T& coll)
+{
+  std::cout << "elems: ";
+  for(const auto& elem : coll)
+  {
+    std::cout << elem << ' ';
+  }
+  std::cout << '\n';
+}
+void demo_std_invoke()
+{
+  std::vector<int> vals{0, 8, 15, 42, 13, -1, 0};
+  call([&vals] { std::cout << "size: " << vals.size() << '\n'; });
+  call(print<std::vector<int>>, vals);
+  call(&decltype(vals)::pop_back, vals);
+  call(print<std::vector<int>>, vals);
+  auto ai = std::atomic<int>(42); // error
+  std::cout << ai.operator int() << std::endl;
+}
 ----
-
-
 
 == Design Patterns
 
@@ -817,13 +890,14 @@ void g() {
 
 === Immutable class in C++ with cheap copying
 
-The `foo` class below is quite DRY, because all the data is stored in immutable shared pointers which automatically know
-how to copy themselves around. All member functions of `foo` should be const.
+The `foo` class below is quite DRY, because all the data is stored in immutable shared pointers which automatically know how to copy themselves around.
+All member functions of `foo` should be const.
 
 If follows the usual paradigm of creating a new version of the object every time you want to make a change.
 Copying `foo` is just a lightweight reference counter bump.
 
 This is nice if you need a lot of copies of something decently large but relatively rarely need to make changes.
+
 [source,cpp]
 ----
 class foo {
@@ -843,6 +917,91 @@ public:
 };
 ----
 
+== Layout
 
+=== Alignment
+
+C++ compilers align variables based on the size of their data type.
+The standard only specifies the sizes of char, signed char, unsigned char, char8_t, and std::byte, which must be 1. It also requires that the size of short must be at least 16 bits, the size of long must be at least 32 bits, and that the size of long long must be at least 64 bits.
+
+It also requires that
+----
+1 == sizeof(char) <= sizeof(short) <= sizeof(int) <= sizeof(long) <= sizeof(long long`.
+----
+
+Therefore, the size of most types are compiler- specific and may depend on the platform.
+Typically, these are 1 byte for `bool` and `char`, 2 bytes for `short`, 4 bytes for `int, long, and float`, 8 bytes for
+`double` and `long long`, and so on.
+When it comes to structures or unions, the alignment must match the size of the largest member in order to avoid performance issues.
+
+`foo1` and `foo2` are different sizes, but the alignment is the same—that is,
+`1`—because all data members are of the type char, which has a size of `1` byte.
+
+[source,cpp]
+----
+struct foo1 // size = 1, alignment = 1
+{           // foo1: +-+
+    char a; // members: |a|
+};
+
+struct foo2 // size = 2, alignment = 1
+{           // foo2: +-+-+
+    char a; // members |a|b|
+    char b;
+};
+
+struct foo3 // size = 8, alignment = 4
+{           // foo3: +----+----+
+    char a; // members: |a...|bbbb|
+    int b;  // . represents a byte of padding
+};
+struct foo3_ // equivalent compiler created structure
+{
+    char a;         // 1 byte
+    char _pad0[3];  // 3 bytes padding to put b on a 4-byte boundary
+    int b;          // 4 bytes
+};
+
+struct foo4 { // size = 24, alignment = 8
+              // foo4: +--------+--------+--------+--------+ //
+  int a;      // members: |aaaab...|cccc....|dddddddd|e.......|
+  char b;     // . represents a byte of padding
+  float c;
+  double d;
+  bool e;
+};
+struct foo4_ // equivalent compiler created structure
+{
+    int a;          // 4 bytes
+    char b;         // 1 byte
+    char _pad0[3];  // 3 bytes padding to put c on a 8-byte boundary
+    float c;        // 4 bytes
+    char _pad1[4];  // 4 bytes padding to put d on a 8-byte boundary
+    double d;       // 8 bytes
+    bool e;         // 1 byte
+    char _pad2[7];  // 7 bytes padding to make sizeof
+}
+struct foo5
+{  // size = 24, alignment = 8
+   // foo5: +--------+--------+--------+--------+ //
+   // members: |dddddddd|aaaacccc|be......|
+  double d;
+  int a;
+  float c;
+  char b;  // . represents a byte of padding
+  bool e;
+};
+void demo_structs1()
+{
+  using namespace std;
+  cout << "size(foo4)=" << sizeof(foo4) << endl;
+  cout << "size(foo5)=" << sizeof(foo5) << endl;
+}
+----
+8 bytes saved with re-ordering.
+----
+size(foo4)=32
+size(foo5)=24
+----
 
 

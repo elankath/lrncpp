@@ -5,10 +5,11 @@
 #define CPPLRN_UTILITIES_HPP
 
 #include <concepts>
+#include <atomic>
 template <typename C, typename... Args> requires std::invocable<C, Args...>
-void call(C&& callable, Args&&... args)
+decltype(auto) call(C&& callable, Args&&... args)
 {
-  std::invoke(std::forward<C>(callable), std::forward<Args>(args)...);
+  return std::invoke(std::forward<C>(callable), std::forward<Args>(args)...);
 }
 
 template <typename T>
@@ -28,6 +29,8 @@ void demo_std_invoke()
   call(print<std::vector<int>>, vals);
   call(&decltype(vals)::pop_back, vals);
   call(print<std::vector<int>>, vals);
+  auto ai = std::atomic<int>(42); // error
+  std::cout << ai.operator int() << std::endl;
 }
 
 #endif  // CPPLRN_UTILITIES_HPP

@@ -7,6 +7,7 @@
 #include <sstream>
 #include <vector>
 #include "learn/utilities.hpp"
+#include "learn/structs.hpp"
 
 void log(std::string_view message, const std::experimental::source_location& location = std::experimental::source_location::current())
 {
@@ -42,7 +43,7 @@ std::ostream& operator<<(std::ostream& os, const person& person)
   copy(it1, end, inserter(s1, s1.end()));
 }
 
-void vector_remove_erase_idiom()
+[[maybe_unused]] void vector_remove_erase_idiom()
 {
   using namespace std;
   vector<int> v{1, 2, 3, 2, 5, 2, 6, 2, 4, 8};
@@ -55,11 +56,6 @@ void vector_remove_erase_idiom()
   v.erase(remove_if(begin(v), end(v), is_odd), end(v));
   cout << "After Odd Del : " << v << endl;
 }
-
-class car
-{
-  std::vector<std::string> wheels;
-};
 
 [[maybe_unused]] void const_lifetime_extension2()
 {
@@ -115,11 +111,11 @@ address create_address_q()
   return a;
 }
 
-void demo_rvalues()  // BAD CODE
+[[maybe_unused]] void demo_rvalues()  // BAD CODE
 {
   std::cout << "entering demo_rvalues" << std::endl;
   auto& addr = create_address_p();
-  std::cout << "0. temp stuff to override stack" << std::endl;  // ifyou comment this it works
+  std::cout << "0. temp stuff to override stack" << std::endl;  // if you comment this it works
   std::cout << "0. addr.city=" << addr.city() << std::endl;     // prints garbage if prev line is not commented
 
   auto&& addr1 = create_address_q();
@@ -150,18 +146,20 @@ void demo_rvalues()  // BAD CODE
   cout << "Sorted  :" << people << endl;
 }
 
-void demo_auto_decls()
+[[maybe_unused]] void demo_auto_decls()
 {
   using namespace std;
   vector v1{2, 3, 4};
   auto v2 = vector<int>{2, 3, 4};
-  auto v3 = {2, 3, 4};
-  auto v4{1};
+  [[maybe_unused]] auto v3 = {2, 3, 4};
+  [[maybe_unused]] auto v4{1};
   auto v5{vector<int>{1}};
   cout << "typeid(v1).name: " << typeid(v1).name() << endl;
   cout << "typeid(v2).name: " << typeid(v2).name() << endl;
   cout << "typeid(v3).name: " << typeid(v3).name() << endl;
   cout << "typeid(v4).name: " << typeid(v4).name() << endl;
+  cout << "v4: " << v4 << endl;
+  cout << "v5: " << v5 << endl;
   cout << "typeid(v5).name: " << typeid(v5).name() << endl;
 }
 int main()
@@ -171,7 +169,9 @@ int main()
   //    vector_remove_erase_idiom();
   //  const_lifetime_extension2();
   //  demo_rvalues();
-  demo_auto_decls();
+//  demo_auto_decls();
   //  demo_sort_with_tie();
+//  demo_std_invoke();
+  demo_structs1();
   return 0;
 }
