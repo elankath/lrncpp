@@ -6,6 +6,7 @@ C++ Notes
 
 == Strings
 
+
 === Use zstring and czstring for C-style,zero-terminated strings.
 
 https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#f25-use-a-zstring-or-a-not_nullzstring-to-designate-a-c-style-string
@@ -75,6 +76,34 @@ auto i = ladd(40, 2); // 42
 auto s = ladd("forty"s, "two"s); // "fortytwo"s
 ----
 
+=== using
+
+* Introduce all the identifiers of a scoped enumeration in the local scope with a using directive
+
+[source,cpp]
+----
+struct foo {
+  enum class Status { Unknown, Created, Connected };
+  using enum Status;
+};
+foo::Status s = foo::Created;  // instead of  foo::Status::Created
+----
+* Use a using enum directive to introduce the enum identifiers in a switch statement to simplify your code:
+
+[source,cpp]
+----
+void process(Status const s) {
+  switch (s) {
+    using enum Status;
+  case Unknown:
+    break;
+  case Created:
+    break;
+  case Connected:
+    break;
+  }
+}
+----
 
 == Pointers, Ownership
 
@@ -560,6 +589,22 @@ C++20 introduced default comparisons, aka the "spaceship" operator<=>, which all
 auto operator<=>(const my_class&) const = default;
 ----
 
+The spaceship operator's default implementation compares data members in the lexical
+order `x`,`y`,`z` even if `z` is phyically placed by compiler at offset 0.
+[source,cpp]
+----
+class flat_land {
+ public:
+  auto operator<=>(const flat_land&) const = default;
+  int x;
+  int y;
+
+ private:
+  int z;
+};
+----
+Generally, the above is not a good idea: It is recommended as much as possible to put all data members at same visibility level.
+
 ==== Always leverage std::tie for comparison
 
 otherwise you can run into the std::sort crash if you don't enforce _strict-weak order_ correctly.
@@ -828,6 +873,7 @@ A generic helper for writing generic code that calls a callable, regardless of w
 [source,cpp]
 ----
 //include::include/learn/utilities.hpp[lines=7..32]
+//include snippet doesn't work due to: https://github.com/github/markup/issues/1095
 template <typename C, typename... Args> requires std::invocable<C, Args...>
 decltype(auto) call(C&& callable, Args&&... args)
 {
@@ -926,7 +972,7 @@ The standard only specifies the sizes of char, signed char, unsigned char, char8
 
 It also requires that
 ----
-1 == sizeof(char) <= sizeof(short) <= sizeof(int) <= sizeof(long) <= sizeof(long long`.
+1 == sizeof(char) <= sizeof(short) <= sizeof(int) <= sizeof(long) <= sizeof(long long)`.
 ----
 
 Therefore, the size of most types are compiler- specific and may depend on the platform.
